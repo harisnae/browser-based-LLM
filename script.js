@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Generate response
-    async function generateResponse() {
+    window.generateResponse = async function() {
         if (isGenerating) return;
         
         const input = inputEl.value.trim();
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }, 3000);
             }
         }
-    }
+    };
     
     // Cancel generation
     function cancelGeneration() {
@@ -273,8 +273,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // Event listeners
-    generateBtn.addEventListener('click', generateResponse);
+    // Replace the button to clear any previous listener issues
+    const newGenerateBtn = generateBtn.cloneNode(true);
+    generateBtn.parentNode.replaceChild(newGenerateBtn, generateBtn);
+    
+    // Attach the listener to the new button
+    newGenerateBtn.addEventListener('click', window.generateResponse);
+    
+    // Event listeners for other buttons
     cancelBtn.addEventListener('click', cancelGeneration);
     clearBtn.addEventListener('click', clearChat);
     
@@ -282,7 +288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            generateResponse();
+            window.generateResponse();
         }
     });
     
