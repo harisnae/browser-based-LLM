@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="public, max-age=31536000, immutable">
+  <title>TinyLlama Browser Chat</title>
+  <link rel="stylesheet" href="style.css">
+  <meta name="description" content="Run TinyLlama 1.1B entirely in your browser with no server required">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>💬 TinyLlama Browser Chat</h1>
+      <div class="status">Model: TinyLlama-1.1B-Chat-v1.0 • Running entirely in your browser</div>
+    </header>
+
+    <main>
+      <div class="chat-container">
+        <div id="chat-history" class="chat-history"></div>
+        
+        <div class="input-area">
+          <textarea id="input" placeholder="Ask me anything..." rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+          
+          <div class="controls">
+            <button id="generate" class="primary">Generate</button>
+            <button id="cancel" class="danger" style="display: none;">Cancel</button>
+            <button id="clear" class="secondary">Clear</button>
+            
+            <div class="settings">
+              <label>
+                Max tokens: 
+                <input type="number" id="maxTokens" value="200" min="50" max="500">
+              </label>
+              <span class="info-tooltip" title="Higher values allow longer responses but take more time and memory">ⓘ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-panel">
+        <div id="output" class="output">
+          ✅ Ready! Click "Generate" to load the model and start chatting.<br><br>
+          <strong>First-time loading note:</strong> The model is approximately 2GB and may take 30-60 seconds to download on first use. Subsequent visits will be faster due to browser caching.
+        </div>
+        
+        <div class="model-info">
+          <p>This demo runs entirely in your browser using the <code>@xenova/transformers</code> library. No data leaves your device.</p>
+          <p>Developed as a lightweight, privacy-focused demonstration of browser-based LLMs.</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Made with ❤️ for GitHub Pages • <a href="https://huggingface.co/Xenova/TinyLlama-1.1B-Chat-v1.0" target="_blank">Model Info</a></p>
+    </footer>
+  </div>
+
+  
+</body>
+</html>
