@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .map(([name]) => name);
     if (missing.length) {
       console.error('Missing DOM elements:', missing);
-      elements.outputDiv?.innerHTML = `<div style="color: var(--error);">
+      elements.outputDiv.innerHTML = `<div style="color: var(--error);">
           ❌ Critical error – missing elements: ${missing.join(', ')}
       </div>`;
       return;
