@@ -42,8 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!checkBrowserCompatibility()) {
             console.log('DEBUG: 6. Compatibility check failed – aborting');
             return;
-        }
-        console.log('DEBUG: 7. Compatibility check passed');
+       DEBUG: 7. Compatibility check passed');
 
         // -----------------------------------------------------------------
         // 4️⃣  Grab DOM elements (null‑safe)
@@ -55,7 +54,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             generateBtn:    document.getElementById('generate'),
             cancelBtn:      document.getElementById('cancel'),
             clearBtn:       document.getElementById('clear'),
-                   };
+            maxTokensInput: document.getElementById('maxTokens')   // <-- added
+        };
 
         // Verify that every critical element exists
         const missing = Object.entries(elements)
@@ -101,14 +101,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 elements.outputDiv.innerHTML =
                     '<div class="spinner"></div> Loading model…';
 
-                const { pipeline } = await import(
-                    'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0'
+                const { pipeline } = await importcdn.jsdelivr.net/npm/@xenova/transformers@2.10.0'
                 );
 
                 elements.outputDiv.innerHTML =
                     '<div class="spinner"></div> Compiling model…';
 
-                // ----------  FIXED MODEL NAME  ----------
+                // ----------  FIXED MODEL NAME ----------
                 generator = await pipeline(
                     'text-generation',
                     'Xenova/blenderbot_small-90M',
