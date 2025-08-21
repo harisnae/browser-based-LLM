@@ -44,3 +44,6 @@ This project demonstrates that modern browsers can execute meaningful language m
 - Cross-platform compatibility (desktop/mobile)
 
 The implementation specifically targets the technical challenges of browser-based LLMs rather than focusing on any particular model, making it a valuable reference for developers exploring this emerging space.
+
+
+### DEMO: ![BROWSER BASED LLM](https://harisnae.github.io/browser-based-LLM/)
