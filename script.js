@@ -4,32 +4,53 @@ function checkBrowserCompatibility() {
     
     // Check for WebAssembly support
     if (!window.WebAssembly) {
-        outputDiv.innerHTML = `
-            <div style="color: var(--error);">
-                ❌ Your browser doesn't support WebAssembly, required for this demo.
-            </div>
-            <p>Please use a modern browser like Chrome, Firefox, Edge, or Safari.</p>
-        `;
-        document.getElementById("generate").disabled = true;
+        if (outputDiv) {
+            outputDiv.innerHTML = `
+                <div style="color: var(--error);">
+                    ❌ Your browser doesn't support WebAssembly, required for this demo.
+                </div>
+                <p>Please use a modern browser like Chrome, Firefox, Edge, or Safari.</p>
+            `;
+        }
+        const generateBtn = document.getElementById("generate");
+        if (generateBtn) generateBtn.disabled = true;
         return false;
     }
     
-    // Check for proper SIMD support (improves performance)
+    // Check for proper SIMD support - MORE ROBUST IMPLEMENTATION
     try {
-        new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
+        // Create a minimal valid WebAssembly module
+        const wasmBytes = new Uint8Array([
+            0, 0x61, 0x73, 0x6d,  // \0asm
+            1, 0, 0, 0             // version 1
+        ]);
+        
+        // First validate before attempting to create module
+        if (typeof WebAssembly.validate === 'function') {
+            if (WebAssembly.validate(wasmBytes)) {
+                new WebAssembly.Module(wasmBytes);
+            }
+        }
     } catch (e) {
-        console.warn("Browser lacks full WebAssembly SIMD support, performance may be suboptimal");
+        console.warn("WebAssembly basic validation failed:", e);
+        // Don't fail completely - just warn
     }
     
     // Check for sufficient memory (heuristic)
-    if (navigator.deviceMemory && navigator.deviceMemory < 4) {
-        console.warn(`Low memory device detected (${navigator.deviceMemory}GB). Performance may be poor.`);
-        outputDiv.innerHTML = `
-            <div style="color: var(--warning);">
-                ⚠️ Low memory device detected. The model requires approximately 2GB of RAM.
-            </div>
-            <p>Performance may be slow or unstable on this device.</p>
-        `;
+    try {
+        if (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory < 4) {
+            console.warn(`Low memory device detected (${navigator.deviceMemory}GB). Performance may be poor.`);
+            if (outputDiv) {
+                outputDiv.innerHTML = `
+                    <div style="color: var(--warning);">
+                        ⚠️ Low memory device detected. The model requires approximately 2GB of RAM.
+                    </div>
+                    <p>Performance may be slow or unstable on this device.</p>
+                `;
+            }
+        }
+    } catch (e) {
+        console.warn("Error checking device memory:", e);
     }
     
     return true;
@@ -47,254 +68,289 @@ ${input}</s>
 
 // Main application
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!checkBrowserCompatibility()) return;
-    
-    // DOM elements
-    const outputDiv = document.getElementById("output");
-    const chatHistory = document.getElementById("chat-history");
-    const inputEl = document.getElementById("input");
-    const generateBtn = document.getElementById("generate");
-    const cancelBtn = document.getElementById("cancel");
-    const clearBtn = document.getElementById("clear");
-    const maxTokensInput = document.getElementById("maxTokens");
-    
-    // State variables
-    let generator = null;
-    let abortController = null;
-    let lastInteraction = Date.now();
-    let isGenerating = false;
-    
-    // Update last interaction time on any user action
-    document.addEventListener('click', () => lastInteraction = Date.now());
-    document.addEventListener('keydown', () => lastInteraction = Date.now());
-    
-    // Add message to chat history
-    function addMessage(role, content) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${role}-message`;
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
-        
-        messageDiv.appendChild(contentDiv);
-        chatHistory.appendChild(messageDiv);
-        
-        // Scroll to bottom
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
-    
-    // Initialize model (lazy-loaded)
-    async function initModel() {
-        if (generator) return true;
-        
-        try {
-            outputDiv.innerHTML = '<div class="spinner"></div> Loading model... This may take 30-60 seconds on first load.';
-            
-            // Dynamically import only when needed
-            const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0");
-            
-            outputDiv.innerHTML = '<div class="spinner"></div> Compiling model...';
-            
-            generator = await pipeline(
-                "text-generation",
-                "Xenova/blenderbot_small-90M",
-                {
-                    progress_callback: (progress) => {
-                        const percent = Math.round(progress * 100);
-                        outputDiv.innerHTML = `<div class="spinner"></div> Loading model: ${percent}%`;
-                    }
-                }
-            );
-            
-            outputDiv.textContent = "✅ Model loaded! Ask away.";
-            return true;
-        } catch (e) {
-            console.error("Model initialization error:", e);
+    // CRITICAL FIX #1: Define generateResponse IMMEDIATELY to ensure it always exists
+    window.generateResponse = async function() {
+        const outputDiv = document.getElementById("output");
+        if (outputDiv) {
             outputDiv.innerHTML = `
                 <div style="color: var(--error);">
-                    ❌ Error loading model: ${e.message || e}
+                    ❌ System initializing... Please wait a moment.
                 </div>
-                <p>Troubleshooting tips:</p>
-                <ul>
-                    <li>Check your internet connection</li>
-                    <li>Try refreshing the page</li>
-                    <li>Ensure you're using a modern browser</li>
-                    <li>Clear browser cache if problem persists</li>
-                </ul>
             `;
-            return false;
         }
-    }
-    
-    // Generate response
-    window.generateResponse = async function() {
-        if (isGenerating) return;
+        console.log("System still initializing - cannot generate response yet");
+    };
+
+    try {
+        if (!checkBrowserCompatibility()) return;
         
-        const input = inputEl.value.trim();
-        if (!input) {
-            outputDiv.textContent = "Please enter a message first.";
-            setTimeout(() => {
-                if (outputDiv.textContent.includes("Please enter a message first.")) {
-                    outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
-                }
-            }, 2000);
-            return;
+        // DOM elements
+        const outputDiv = document.getElementById("output");
+        const chatHistory = document.getElementById("chat-history");
+        const inputEl = document.getElementById("input");
+        const generateBtn = document.getElementById("generate");
+        const cancelBtn = document.getElementById("cancel");
+        const clearBtn = document.getElementById("clear");
+        const maxTokensInput = document.getElementById("maxTokens");
+        
+        // State variables
+        let generator = null;
+        let abortController = null;
+        let lastInteraction = Date.now();
+        let isGenerating = false;
+        
+        // Update last interaction time on any user action
+        document.addEventListener('click', () => lastInteraction = Date.now());
+        document.addEventListener('keydown', () => lastInteraction = Date.now());
+        
+        // Add message to chat history
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}-message`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(contentDiv);
+            chatHistory.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            chatHistory.scrollTop = chatHistory.scrollHeight;
         }
         
-        // Add user message to chat
-        addMessage('user', input);
+        // Initialize model (lazy-loaded)
+        async function initModel() {
+            if (generator) return true;
+            
+            try {
+                outputDiv.innerHTML = '<div class="spinner"></div> Loading model... This may take 30-60 seconds on first load.';
+                
+                // Dynamically import only when needed
+                const { pipeline } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0");
+                
+                outputDiv.innerHTML = '<div class="spinner"></div> Compiling model...';
+                
+                generator = await pipeline(
+                    "text-generation",
+                    "Xenova/blenderbot_small-90M",
+                    {
+                        progress_callback: (progress) => {
+                            const percent = Math.round(progress * 100);
+                            outputDiv.innerHTML = `<div class="spinner"></div> Loading model: ${percent}%`;
+                        }
+                    }
+                );
+                
+                outputDiv.textContent = "✅ Model loaded! Ask away.";
+                return true;
+            } catch (e) {
+                console.error("Model initialization error:", e);
+                outputDiv.innerHTML = `
+                    <div style="color: var(--error);">
+                        ❌ Error loading model: ${e.message || e}
+                    </div>
+                    <p>Troubleshooting tips:</p>
+                    <ul>
+                        <li>Check your internet connection</li>
+                        <li>Try refreshing the page</li>
+                        <li>Ensure you're using a modern browser</li>
+                        <li>Clear browser cache if problem persists</li>
+                    </ul>
+                `;
+                return false;
+            }
+        }
         
-        // Clear input
-        inputEl.value = '';
-        
-        // Set generating state
-        isGenerating = true;
-        cancelBtn.style.display = 'inline-flex';
-        generateBtn.disabled = true;
-        outputDiv.innerHTML = '<div class="spinner"></div> Generating response...';
-        
-        try {
-            // Initialize model if not already done
-            if (!await initModel()) {
-                isGenerating = false;
-                generateBtn.disabled = false;
-                cancelBtn.style.display = 'none';
+        // CRITICAL FIX #2: Redefine generateResponse with full implementation
+        window.generateResponse = async function() {
+            if (isGenerating) return;
+            
+            const input = inputEl.value.trim();
+            if (!input) {
+                outputDiv.textContent = "Please enter a message first.";
+                setTimeout(() => {
+                    if (outputDiv.textContent.includes("Please enter a message first.")) {
+                        outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
+                    }
+                }, 2000);
                 return;
             }
             
-            // Prepare for cancellation
-            abortController = new AbortController();
-            const { signal } = abortController;
+            // Add user message to chat
+            addMessage('user', input);
             
-            // Format the input for the chat model
-            const formattedInput = formatChat(input);
+            // Clear input
+            inputEl.value = '';
             
-            // Generate response with streaming
-            const result = await generator(formattedInput, {
-                max_new_tokens: parseInt(maxTokensInput.value),
-                temperature: 0.7,
-                repetition_penalty: 1.1,
-                do_sample: true,
-                signal,
-                stream: true
-            });
+            // Set generating state
+            isGenerating = true;
+            cancelBtn.style.display = 'inline-flex';
+            generateBtn.disabled = true;
+            outputDiv.innerHTML = '<div class="spinner"></div> Generating response...';
             
-            // Process streaming response
-            let fullResponse = '';
-            outputDiv.textContent = '';
-            
-            for await (const update of result) {
-                const newToken = update.generated_text.slice(-1);
-                fullResponse += newToken;
+            try {
+                // Initialize model if not already done
+                if (!await initModel()) {
+                    isGenerating = false;
+                    generateBtn.disabled = false;
+                    cancelBtn.style.display = 'none';
+                    return;
+                }
                 
-                // Update output in real-time
-                outputDiv.textContent = fullResponse;
+                // Prepare for cancellation
+                abortController = new AbortController();
+                const { signal } = abortController;
                 
-                // Also update chat history in real-time
-                if (chatHistory.lastChild) {
-                    chatHistory.lastChild.querySelector('.message-content').textContent = fullResponse;
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
+                // Format the input for the chat model
+                const formattedInput = formatChat(input);
+                
+                // Generate response with streaming
+                const result = await generator(formattedInput, {
+                    max_new_tokens: parseInt(maxTokensInput.value),
+                    temperature: 0.7,
+                    repetition_penalty: 1.1,
+                    do_sample: true,
+                    signal,
+                    stream: true
+                });
+                
+                // Process streaming response
+                let fullResponse = '';
+                outputDiv.textContent = '';
+                
+                for await (const update of result) {
+                    const newToken = update.generated_text.slice(-1);
+                    fullResponse += newToken;
+                    
+                    // Update output in real-time
+                    outputDiv.textContent = fullResponse;
+                    
+                    // Also update chat history in real-time
+                    if (chatHistory.lastChild) {
+                        chatHistory.lastChild.querySelector('.message-content').textContent = fullResponse;
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                    }
+                }
+                
+                // Add to chat history
+                addMessage('assistant', fullResponse);
+                
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    outputDiv.textContent += "\n\n[Generation cancelled]";
+                } else {
+                    console.error("Generation error:", e);
+                    outputDiv.innerHTML = `
+                        <div style="color: var(--error);">
+                            ❌ Error generating response: ${e.message || e}
+                        </div>
+                    `;
+                }
+            } finally {
+                isGenerating = false;
+                generateBtn.disabled = false;
+                cancelBtn.style.display = 'none';
+                abortController = null;
+                
+                // Reset to ready state if no error
+                if (outputDiv.textContent && !outputDiv.textContent.includes('❌')) {
+                    outputDiv.textContent = "✅ Ready for next question!";
+                    setTimeout(() => {
+                        if (outputDiv.textContent === "✅ Ready for next question!") {
+                            outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
+                        }
+                    }, 3000);
                 }
             }
+        };
+        
+        // Cancel generation
+        function cancelGeneration() {
+            if (abortController) {
+                abortController.abort();
+                outputDiv.textContent += "\n\n[Cancelled]";
+            }
+        }
+        
+        // Clear chat
+        function clearChat() {
+            chatHistory.innerHTML = '';
+            outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
+        }
+        
+        // Memory management
+        function setupMemoryMonitoring() {
+            // Check memory usage periodically
+            setInterval(() => {
+                lastInteraction = Date.now();
+                
+                // If model is loaded but no interaction for 10 minutes, consider unloading
+                if (generator && (Date.now() - lastInteraction > 600000)) { // 10 minutes
+                    console.log("No interaction for 10 minutes, unloading model to free memory");
+                    generator = null;
+                    outputDiv.textContent = "Model unloaded to save memory. Click 'Generate' to reload.";
+                }
+            }, 60000); // Check every minute
             
-            // Add to chat history
-            addMessage('assistant', fullResponse);
-            
-        } catch (e) {
-            if (e.name === 'AbortError') {
-                outputDiv.textContent += "\n\n[Generation cancelled]";
-            } else {
-                console.error("Generation error:", e);
+            // Browser memory API check
+            if ('memory' in performance) {
+                setInterval(() => {
+                    const { usedJSHeapSize, jsHeapSizeLimit } = performance.memory;
+                    const usage = usedJSHeapSize / jsHeapSizeLimit;
+                    
+                    if (usage > 0.9 && generator) {
+                        console.warn(`Memory usage high (${(usage * 100).toFixed(1)}%), unloading model`);
+                        generator = null;
+                        outputDiv.textContent = "Memory pressure detected. Model unloaded. Click 'Generate' to reload.";
+                    }
+                }, 30000); // Check every 30 seconds
+            }
+        }
+        
+        // Replace the button to clear any previous listener issues
+        const newGenerateBtn = generateBtn.cloneNode(true);
+        generateBtn.parentNode.replaceChild(newGenerateBtn, generateBtn);
+        
+        // Attach the listener to the new button
+        newGenerateBtn.addEventListener('click', window.generateResponse);
+        
+        // Event listeners for other buttons
+        cancelBtn.addEventListener('click', cancelGeneration);
+        clearBtn.addEventListener('click', clearChat);
+        
+        // Allow Enter to submit (but Shift+Enter for new line)
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                window.generateResponse();
+            }
+        });
+        
+        // Initialize memory monitoring
+        setupMemoryMonitoring();
+        
+        // Focus input on load
+        setTimeout(() => inputEl.focus(), 500);
+        
+        console.log("System initialized successfully");
+        if (outputDiv) {
+            outputDiv.textContent = "✅ System initialized. Click 'Generate' to load the model.";
+        }
+    } catch (e) {
+        console.error("CRITICAL ERROR in initialization:", e);
+        try {
+            const outputDiv = document.getElementById("output");
+            if (outputDiv) {
                 outputDiv.innerHTML = `
                     <div style="color: var(--error);">
-                        ❌ Error generating response: ${e.message || e}
+                        ❌ Critical error: ${e.message}
                     </div>
+                    <p>Technical details logged to browser console.</p>
                 `;
             }
-        } finally {
-            isGenerating = false;
-            generateBtn.disabled = false;
-            cancelBtn.style.display = 'none';
-            abortController = null;
-            
-            // Reset to ready state if no error
-            if (outputDiv.textContent && !outputDiv.textContent.includes('❌')) {
-                outputDiv.textContent = "✅ Ready for next question!";
-                setTimeout(() => {
-                    if (outputDiv.textContent === "✅ Ready for next question!") {
-                        outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
-                    }
-                }, 3000);
-            }
-        }
-    };
-    
-    // Cancel generation
-    function cancelGeneration() {
-        if (abortController) {
-            abortController.abort();
-            outputDiv.textContent += "\n\n[Cancelled]";
+        } catch (innerError) {
+            console.error("Could not display error message:", innerError);
         }
     }
-    
-    // Clear chat
-    function clearChat() {
-        chatHistory.innerHTML = '';
-        outputDiv.textContent = generator ? "✅ Model loaded! Ask away." : "✅ Ready! Click 'Generate' to load the model.";
-    }
-    
-    // Memory management
-    function setupMemoryMonitoring() {
-        // Check memory usage periodically
-        setInterval(() => {
-            lastInteraction = Date.now();
-            
-            // If model is loaded but no interaction for 10 minutes, consider unloading
-            if (generator && (Date.now() - lastInteraction > 600000)) { // 10 minutes
-                console.log("No interaction for 10 minutes, unloading model to free memory");
-                generator = null;
-                outputDiv.textContent = "Model unloaded to save memory. Click 'Generate' to reload.";
-            }
-        }, 60000); // Check every minute
-        
-        // Browser memory API check
-        if ('memory' in performance) {
-            setInterval(() => {
-                const { usedJSHeapSize, jsHeapSizeLimit } = performance.memory;
-                const usage = usedJSHeapSize / jsHeapSizeLimit;
-                
-                if (usage > 0.9 && generator) {
-                    console.warn(`Memory usage high (${(usage * 100).toFixed(1)}%), unloading model`);
-                    generator = null;
-                    outputDiv.textContent = "Memory pressure detected. Model unloaded. Click 'Generate' to reload.";
-                }
-            }, 30000); // Check every 30 seconds
-        }
-    }
-    
-    // Replace the button to clear any previous listener issues
-    const newGenerateBtn = generateBtn.cloneNode(true);
-    generateBtn.parentNode.replaceChild(newGenerateBtn, generateBtn);
-    
-    // Attach the listener to the new button
-    newGenerateBtn.addEventListener('click', window.generateResponse);
-    
-    // Event listeners for other buttons
-    cancelBtn.addEventListener('click', cancelGeneration);
-    clearBtn.addEventListener('click', clearChat);
-    
-    // Allow Enter to submit (but Shift+Enter for new line)
-    inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            window.generateResponse();
-        }
-    });
-    
-    // Initialize memory monitoring
-    setupMemoryMonitoring();
-    
-    // Focus input on load
-    setTimeout(() => inputEl.focus(), 500);
 });
