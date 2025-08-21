@@ -1,102 +1,3 @@
-// Browser compatibility check - FIXED WITH DETAILED ERROR HANDLING
-function checkBrowserCompatibility() {
-    try {
-        console.log("DEBUG: A. checkBrowserCompatibility function started");
-        
-        const outputDiv = document.getElementById("output");
-        console.log("DEBUG: B. outputDiv element:", outputDiv ? "FOUND" : "NOT FOUND");
-        
-        // Check for WebAssembly support - MORE ROBUST
-        console.log("DEBUG: C. Checking WebAssembly support");
-        if (typeof WebAssembly === 'undefined' || !WebAssembly.validate) {
-            console.error("DEBUG: D. WebAssembly is NOT supported by this browser");
-            if (outputDiv) {
-                outputDiv.innerHTML = `
-                    <div style="color: var(--error);">
-                        ❌ Your browser doesn't support WebAssembly, required for this demo.
-                    </div>
-                    <p>Please use a modern browser like Chrome, Firefox, Edge, or Safari.</p>
-                `;
-            }
-            const generateBtn = document.getElementById("generate");
-            console.log("DEBUG: E. generateBtn element:", generateBtn ? "FOUND" : "NOT FOUND");
-            if (generateBtn) generateBtn.disabled = true;
-            return false;
-        }
-        console.log("DEBUG: F. WebAssembly IS supported by this browser");
-        
-        // Check for proper SIMD support - MORE ROBUST
-        console.log("DEBUG: G. Checking WebAssembly SIMD support");
-        try {
-            const wasmBytes = new Uint8Array([
-                0, 0x61, 0x73, 0x6d,  // \0asm
-                1, 0, 0, 0             // version 1
-            ]);
-            
-            if (typeof WebAssembly.validate === 'function' && WebAssembly.validate(wasmBytes)) {
-                new WebAssembly.Module(wasmBytes);
-                console.log("DEBUG: H. Full WebAssembly SIMD support confirmed");
-            } else {
-                console.warn("DEBUG: I. Browser lacks full WebAssembly SIMD support, performance may be suboptimal");
-            }
-        } catch (e) {
-            console.warn("DEBUG: J. WebAssembly basic validation failed:", e);
-        }
-        
-        // Check for sufficient memory - MORE ROBUST
-        console.log("DEBUG: K. Checking device memory");
-        try {
-            if (typeof navigator.deviceMemory === 'number') {
-                console.log(`DEBUG: L. Device memory detected: ${navigator.deviceMemory}GB`);
-                if (navigator.deviceMemory < 4) {
-                    console.warn(`DEBUG: M. Low memory device detected (${navigator.deviceMemory}GB). Performance may be poor.`);
-                    if (outputDiv) {
-                        outputDiv.innerHTML = `
-                            <div style="color: var(--warning);">
-                                ⚠️ Low memory device detected. The model requires approximately 2GB of RAM.
-                            </div>
-                            <p>Performance may be slow or unstable on this device.</p>
-                        `;
-                    }
-                }
-            } else {
-                console.log("DEBUG: N. navigator.deviceMemory not available in this browser");
-            }
-        } catch (e) {
-            console.warn("DEBUG: O. Error checking device memory:", e);
-        }
-        
-        console.log("DEBUG: P. Browser compatibility check completed successfully");
-        return true;
-    } catch (e) {
-        console.error("CRITICAL ERROR in checkBrowserCompatibility:", e);
-        try {
-            const outputDiv = document.getElementById("output");
-            if (outputDiv) {
-                outputDiv.innerHTML = `
-                    <div style="color: var(--error);">
-                        ❌ Critical browser check error: ${e.message}
-                    </div>
-                `;
-            }
-        } catch (innerError) {
-            console.error("Could not display browser check error:", innerError);
-        }
-        return false;
-    }
-}
-
-// Format chat for Blenderbot
-function formatChat(input) {
-    return `<|system|>
-You are a helpful AI assistant. Keep responses concise and helpful.</s>
-<|user|>
-${input}</s>
-<|assistant|>
-`;
-}
-
-// Main application - FIXED WITH EARLY FUNCTION DEFINITION
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("DEBUG: 1. DOMContentLoaded handler started");
     
@@ -233,10 +134,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.generateResponse = async function() {
             console.log("DEBUG: 13. FULL generateResponse function called successfully!");
             
-            if (isGenerating) return;
+            if (isGenerating) {
+                console.log("DEBUG: 13.1. Generation is already in progress, returning early.");
+                return;
+            }
             
             const input = elements.inputEl.value.trim();
             if (!input) {
+                console.log("DEBUG: 13.2. No input provided, displaying message.");
                 elements.outputDiv.textContent = "Please enter a message first.";
                 setTimeout(() => {
                     if (elements.outputDiv.textContent.includes("Please enter a message first.")) {
@@ -247,12 +152,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             // Add user message to chat
+            console.log("DEBUG: 13.3. Adding user message to chat.");
             addMessage('user', input);
             
             // Clear input
+            console.log("DEBUG: 13.4. Clearing input field.");
             elements.inputEl.value = '';
             
             // Set generating state
+            console.log("DEBUG: 13.5. Setting generating state.");
             isGenerating = true;
             elements.cancelBtn.style.display = 'inline-flex';
             elements.generateBtn.disabled = true;
@@ -260,7 +168,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             try {
                 // Initialize model if not already done
+                console.log("DEBUG: 13.6. Initializing model if not already done.");
                 if (!await initModel()) {
+                    console.log("DEBUG: 13.7. Model initialization failed, resetting state.");
                     isGenerating = false;
                     elements.generateBtn.disabled = false;
                     elements.cancelBtn.style.display = 'none';
@@ -268,13 +178,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 // Prepare for cancellation
+                console.log("DEBUG: 13.8. Preparing for cancellation.");
                 abortController = new AbortController();
                 const { signal } = abortController;
                 
                 // Format the input for the chat model
+                console.log("DEBUG: 13.9. Formatting input for chat model.");
                 const formattedInput = formatChat(input);
                 
                 // Generate response with streaming
+                console.log("DEBUG: 13.10. Generating response with streaming.");
                 const result = await generator(formattedInput, {
                     max_new_tokens: parseInt(elements.maxTokensInput.value),
                     temperature: 0.7,
@@ -285,6 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 
                 // Process streaming response
+                console.log("DEBUG: 13.11. Processing streaming response.");
                 let fullResponse = '';
                 elements.outputDiv.textContent = '';
                 
@@ -293,23 +207,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     fullResponse += newToken;
                     
                     // Update output in real-time
+                    console.log("DEBUG: 13.12. Updating output in real-time.");
                     elements.outputDiv.textContent = fullResponse;
                     
                     // Also update chat history in real-time
                     if (elements.chatHistory.lastChild) {
+                        console.log("DEBUG: 13.13. Updating chat history in real-time.");
                         elements.chatHistory.lastChild.querySelector('.message-content').textContent = fullResponse;
                         elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
                     }
                 }
                 
                 // Add to chat history
+                console.log("DEBUG: 13.14. Adding assistant message to chat history.");
                 addMessage('assistant', fullResponse);
                 
             } catch (e) {
                 if (e.name === 'AbortError') {
+                    console.log("DEBUG: 13.15. Generation cancelled.");
                     elements.outputDiv.textContent += "\n\n[Generation cancelled]";
                 } else {
                     console.error("Generation error:", e);
+                    console.log("DEBUG: 13.16. Error generating response.");
                     elements.outputDiv.innerHTML = `
                         <div style="color: var(--error);">
                             ❌ Error generating response: ${e.message || e}
@@ -317,6 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     `;
                 }
             } finally {
+                console.log("DEBUG: 13.17. Resetting generating state.");
                 isGenerating = false;
                 elements.generateBtn.disabled = false;
                 elements.cancelBtn.style.display = 'none';
@@ -324,6 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Reset to ready state if no error
                 if (elements.outputDiv.textContent && !elements.outputDiv.textContent.includes('❌')) {
+                    console.log("DEBUG: 13.18. Resetting to ready state.");
                     elements.outputDiv.textContent = "✅ Ready for next question!";
                     setTimeout(() => {
                         if (elements.outputDiv.textContent === "✅ Ready for next question!") {
